@@ -18,8 +18,9 @@ export default function App(){
   ]);
   const [selectedHUId, setSelectedHUId] = useState<string|null>(null);
   const [currentContainerIdx, setCurrentContainerIdx] = useState(0);
+  const [repackVersion, setRepackVersion] = useState(0);
 
-  const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType]);
+  const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType, repackVersion]);
   const plan = plans[currentContainerIdx] || plans[0];
 
   const containerVolume = volCm3(dims.L, dims.W, dims.H);
@@ -27,6 +28,40 @@ export default function App(){
   const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of plan?.placements || []) s.add(p.stopKey); return Array.from(s); }, [plan]);
 
   const removeHU = (id: string) => { setHUs((prev)=>prev.filter((x)=>x.id!==id)); if (selectedHUId===id) setSelectedHUId(null); };
+
+  const editHU = (hu: HU) => {
+    const parse = (s: string | null, fallback: number) => {
+      if (s === null) return fallback;
+      const n = Number(s);
+      return isNaN(n) ? fallback : n;
+    };
+    const lengthStr = prompt("Length (cm)", String(hu.length_cm));
+    if (lengthStr === null) return;
+    const widthStr = prompt("Width (cm)", String(hu.width_cm));
+    if (widthStr === null) return;
+    const heightStr = prompt("Height (cm)", String(hu.height_cm));
+    if (heightStr === null) return;
+    const weightStr = prompt("Weight (kg)", String(hu.weight_kg));
+    if (weightStr === null) return;
+    const stackableStr = prompt("Stackable? (yes/no)", hu.stackable ? "yes" : "no");
+    if (stackableStr === null) return;
+    const deliveryDateStr = prompt("Delivery date (YYYY-MM-DD)", hu.deliveryDate);
+    if (deliveryDateStr === null) return;
+    const placeStr = prompt("Place of delivery", hu.place);
+    if (placeStr === null) return;
+    const updated: HU = {
+      ...hu,
+      length_cm: parse(lengthStr, hu.length_cm),
+      width_cm: parse(widthStr, hu.width_cm),
+      height_cm: parse(heightStr, hu.height_cm),
+      weight_kg: parse(weightStr, hu.weight_kg),
+      stackable: stackableStr.trim().toLowerCase().startsWith("y"),
+      deliveryDate: deliveryDateStr,
+      place: placeStr,
+    };
+    setHUs((prev) => prev.map((x) => (x.id === hu.id ? updated : x)));
+    setCurrentContainerIdx(0);
+  };
 
   return (
     <div className="layout">
@@ -53,7 +88,7 @@ export default function App(){
       <div className="content">
         <div className="left">
           <HUForm onAdd={(hu)=>{ setHUs((p)=>[...p, hu]); setCurrentContainerIdx(0); }} />
-          <HUList items={hus} onRemove={removeHU} onFocus={setSelectedHUId} selectedId={selectedHUId} />
+          <HUList items={hus} onRemove={removeHU} onFocus={setSelectedHUId} onEdit={editHU} selectedId={selectedHUId} />
           <Legend stops={stops} />
         </div>
 
@@ -61,6 +96,7 @@ export default function App(){
           <div className="toolbar">
             <div className="muted">Viewing container <strong>{currentContainerIdx+1}</strong> / {plans.length} — {dims.name}</div>
             <div className="row gap">
+              <button className="btn" onClick={()=>{ setRepackVersion((v)=>v+1); setCurrentContainerIdx(0); }}>Re-run allocation</button>
               <button className="btn" disabled={currentContainerIdx===0} onClick={()=>setCurrentContainerIdx((i)=>Math.max(0, i-1))}>◀ Prev</button>
               <button className="btn" disabled={currentContainerIdx>=plans.length-1} onClick={()=>setCurrentContainerIdx((i)=>Math.min(plans.length-1, i+1))}>Next ▶</button>
             </div>

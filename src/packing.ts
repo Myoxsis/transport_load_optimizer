@@ -50,8 +50,9 @@ export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTy
         for (const row of level.rows) { const p = tryPlaceInRow(hu, level, row, dims, g.key); if (p) { placed = p; if (level.height === 0) level.height = p.h; row.xCursor = p.x; break; } }
         if (!placed) {
           const usedWidth = level.rows.reduce((s, r) => s + r.depth, 0);
-          const options: Array<[number, number, boolean]> = [[hu.width_cm, hu.length_cm, false],[hu.length_cm, hu.width_cm, true]].sort((a,b)=>a[0]-b[0]);
-          for (const [rowDepth, otherLen, rotatedOther] of options) {
+            const options: [number, number, boolean][] = [[hu.width_cm, hu.length_cm, false],[hu.length_cm, hu.width_cm, true]];
+            options.sort((a,b)=>a[0]-b[0]);
+            for (const [rowDepth, otherLen, rotatedOther] of options) {
             const h = hu.height_cm; const canLevel = level.height === 0 || h <= level.height;
             if (canLevel && usedWidth + rowDepth <= dims.W && otherLen <= dims.L) {
               const newRow: Row = { yStart: usedWidth, depth: rowDepth, xCursor: dims.L };
@@ -66,8 +67,9 @@ export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTy
           const cannotStack = current.hasNonStackable; const nextZ = level.zStart + (level.height || 0); const h = hu.height_cm;
           if (!cannotStack && nextZ + h <= dims.H) {
             const newLevel: Level = { zStart: nextZ, height: 0, rows: [] }; current.levels.push(newLevel); level = newLevel;
-            const options: Array<[number, number, boolean]> = [[hu.width_cm, hu.length_cm, false],[hu.length_cm, hu.width_cm, true]].sort((a,b)=>a[0]-b[0]);
-            const [rowDepth, otherLen, rotatedOther] = options[0];
+              const options: [number, number, boolean][] = [[hu.width_cm, hu.length_cm, false],[hu.length_cm, hu.width_cm, true]];
+              options.sort((a,b)=>a[0]-b[0]);
+              const [rowDepth, otherLen, rotatedOther] = options[0];
             if (rowDepth <= dims.W && otherLen <= dims.L) {
               const newRow: Row = { yStart: 0, depth: rowDepth, xCursor: dims.L }; level.rows.push(newRow);
               const l = rotatedOther ? hu.width_cm : hu.length_cm; const w = rotatedOther ? hu.length_cm : hu.width_cm; const x = newRow.xCursor - l;

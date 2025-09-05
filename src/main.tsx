@@ -4,13 +4,16 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles.css";
 import { HUsProvider } from "./HUsContext";
+import { ContainersProvider } from "./ContainersContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <HUsProvider>
-        <App />
-      </HUsProvider>
+      <ContainersProvider>
+        <HUsProvider>
+          <App />
+        </HUsProvider>
+      </ContainersProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

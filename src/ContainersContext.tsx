@@ -13,7 +13,9 @@ export function ContainersProvider({ children }: { children: React.ReactNode }) 
     const stored = localStorage.getItem("containers");
     if (stored) {
       try {
-        return JSON.parse(stored) as ManagedContainer[];
+        // Drop any persisted HU assignments so containers start empty
+        const parsed = JSON.parse(stored) as ManagedContainer[];
+        return parsed.map(c => ({ ...c, huIds: [] }));
       } catch {
         /* ignore */
       }

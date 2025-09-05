@@ -1,0 +1,134 @@
+import React, { useMemo, useState } from "react";
+import { HU, ContainerPlan, ContainerTypeKey } from "../types";
+import { CONTAINERS, packHUsIntoContainers, volCm3 } from "../packing";
+import { HUForm } from "../components/HUForm";
+import { HUList } from "../components/HUList";
+import { Legend } from "../components/Legend";
+import { Viewer3D } from "../components/Viewer3D";
+import { StatsBar } from "../components/StatsBar";
+
+export default function OptiContainer(){
+  const [containerType, setContainerType] = useState<ContainerTypeKey>("20GP");
+  const dims = CONTAINERS[containerType];
+  const [hus, setHUs] = useState<HU[]>([
+    { id: "HU-001", length_cm: 240, width_cm: 100, height_cm: 110, weight_kg: 480, stackable: false, deliveryDate: "2025-09-20", place: "Lyon" },
+    { id: "HU-002", length_cm: 120, width_cm: 80, height_cm: 75, weight_kg: 220, stackable: true, deliveryDate: "2025-09-18", place: "Lyon" },
+    { id: "HU-003", length_cm: 310, width_cm: 90, height_cm: 100, weight_kg: 600, stackable: true, deliveryDate: "2025-09-25", place: "Bordeaux" },
+    { id: "HU-004", length_cm: 200, width_cm: 120, height_cm: 150, weight_kg: 350, stackable: true, deliveryDate: "2025-09-18", place: "Lyon" },
+  ]);
+  const [selectedHUId, setSelectedHUId] = useState<string|null>(null);
+  const [currentContainerIdx, setCurrentContainerIdx] = useState(0);
+  const [repackVersion, setRepackVersion] = useState(0);
+
+  const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType, repackVersion]);
+  const plan = plans[currentContainerIdx] || plans[0];
+
+  const containerVolume = volCm3(dims.L, dims.W, dims.H);
+  const utilization = plan ? Math.min(100, (plan.usedVolumeCm3 / containerVolume) * 100) : 0;
+  const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of plan?.placements || []) s.add(p.stopKey); return Array.from(s); }, [plan]);
+
+  const removeHU = (id: string) => { setHUs((prev)=>prev.filter((x)=>x.id!==id)); if (selectedHUId===id) setSelectedHUId(null); };
+
+  const editHU = (hu: HU) => {
+    const parse = (s: string | null, fallback: number) => {
+      if (s === null) return fallback;
+      const n = Number(s);
+      return isNaN(n) ? fallback : n;
+    };
+    const lengthStr = prompt("Length (cm)", String(hu.length_cm));
+    if (lengthStr === null) return;
+    const widthStr = prompt("Width (cm)", String(hu.width_cm));
+    if (widthStr === null) return;
+    const heightStr = prompt("Height (cm)", String(hu.height_cm));
+    if (heightStr === null) return;
+    const weightStr = prompt("Weight (kg)", String(hu.weight_kg));
+    if (weightStr === null) return;
+    const stackableStr = prompt("Stackable? (yes/no)", hu.stackable ? "yes" : "no");
+    if (stackableStr === null) return;
+    const deliveryDateStr = prompt("Delivery date (YYYY-MM-DD)", hu.deliveryDate);
+    if (deliveryDateStr === null) return;
+    const placeStr = prompt("Place of delivery", hu.place);
+    if (placeStr === null) return;
+    const updated: HU = {
+      ...hu,
+      length_cm: parse(lengthStr, hu.length_cm),
+      width_cm: parse(widthStr, hu.width_cm),
+      height_cm: parse(heightStr, hu.height_cm),
+      weight_kg: parse(weightStr, hu.weight_kg),
+      stackable: stackableStr.trim().toLowerCase().startsWith("y"),
+      deliveryDate: deliveryDateStr,
+      place: placeStr,
+    };
+    setHUs((prev) => prev.map((x) => (x.id === hu.id ? updated : x)));
+    setCurrentContainerIdx(0);
+  };
+
+  return (
+    <div className="layout">
+      <header className="header">
+        <h1>Container Optimizer — MVP</h1>
+        <div className="segmented">
+          <button className={`seg ${containerType==="20GP"?"active":""}`} onClick={()=>{ setContainerType("20GP"); setCurrentContainerIdx(0); }}>20′ Standard</button>
+          <button className={`seg ${containerType==="40GP"?"active":""}`} onClick={()=>{ setContainerType("40GP"); setCurrentContainerIdx(0); }}>40′ Standard</button>
+        </div>
+      </header>
+
+      <div className="card" style={{marginTop: 0}}>
+        <div className="card-title">What is a “Handling Unit (HU)”?</div>
+        <div className="muted">An HU is any package moved as one piece: a pallet, crate, skid or large part. Enter its <strong>Length × Width × Height (cm)</strong>, <strong>Weight (kg)</strong>, whether it is <strong>Stackable</strong>, and its <strong>delivery date & place</strong>. The optimizer groups by stop (date+place) and plans loading so earlier deliveries are near the door.</div>
+      </div>
+
+      <StatsBar items={[
+        { label: "Containers", value: plans.length },
+        { label: "Current payload (kg)", value: plan ? Math.round(plan.totalWeight) : 0 },
+        { label: "Max payload (kg)", value: dims.maxPayloadKg },
+        { label: "Vol. utilization (%)", value: `${plan ? utilization.toFixed(1) : 0}%` },
+      ]} />
+
+      <div className="content">
+        <div className="left">
+          <HUForm onAdd={(hu)=>{ setHUs((p)=>[...p, hu]); setCurrentContainerIdx(0); }} />
+          <HUList items={hus} onRemove={removeHU} onFocus={setSelectedHUId} onEdit={editHU} selectedId={selectedHUId} />
+          <Legend stops={stops} />
+        </div>
+
+        <div className="right">
+          <div className="toolbar">
+            <div className="muted">Viewing container <strong>{currentContainerIdx+1}</strong> / {plans.length} — {dims.name}</div>
+            <div className="row gap">
+              <button className="btn" onClick={()=>{ setRepackVersion((v)=>v+1); setCurrentContainerIdx(0); }}>Re-run allocation</button>
+              <button className="btn" disabled={currentContainerIdx===0} onClick={()=>setCurrentContainerIdx((i)=>Math.max(0, i-1))}>◀ Prev</button>
+              <button className="btn" disabled={currentContainerIdx>=plans.length-1} onClick={()=>setCurrentContainerIdx((i)=>Math.min(plans.length-1, i+1))}>Next ▶</button>
+            </div>
+          </div>
+          <Viewer3D dims={dims} placements={plan?.placements || []} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} />
+
+          <div className="card">
+            <div className="card-title">Placements in current container</div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr><th>Handling Unit</th><th>Stop</th><th>L×W×H (cm)</th><th>Pos (x,y,z cm)</th><th>Rot</th></tr>
+                </thead>
+                <tbody>
+                  {plan?.placements.map((p,i)=> (
+                    <tr key={i} className={selectedHUId===p.huId?"active":""}>
+                      <td className="mono">{p.huId}</td>
+                      <td>{p.stopKey}</td>
+                      <td>{p.l}×{p.w}×{p.h}</td>
+                      <td>{Math.round(p.x)} , {Math.round(p.y)} , {Math.round(p.z)}</td>
+                      <td>{p.rotatedLW?"L↔W":"—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="note">Note: LIFO by delivery (latest placed at the far end). Non-stackable HUs disable upper levels in that container (MVP rule).</div>
+          </div>
+        </div>
+      </div>
+
+      <footer className="footer">MVP heuristic — add door aperture checks, center-of-gravity and stackability rules before production.</footer>
+    </div>
+  );
+}

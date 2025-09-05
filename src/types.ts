@@ -39,3 +39,9 @@ export type ContainerPlan = {
   usedVolumeCm3: number;
   hasNonStackable: boolean;
 };
+export type ManagedContainer = {
+  id: string;
+  type: ContainerTypeKey;
+  properties: ContainerDims;
+  huIds: string[];
+};

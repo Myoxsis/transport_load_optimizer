@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { HU, ContainerPlan, ContainerTypeKey } from "../types";
 import { CONTAINERS, packHUsIntoContainers, volCm3 } from "../packing";
 import { HUForm } from "../components/HUForm";
@@ -8,6 +8,7 @@ import { Viewer3D } from "../components/Viewer3D";
 import { StatsBar } from "../components/StatsBar";
 import { HUEditModal } from "../components/HUEditModal";
 import { useHUs } from "../HUsContext";
+import { useContainers } from "../ContainersContext";
 
 export default function OptiContainer(){
   const [containerType, setContainerType] = useState<ContainerTypeKey>("20GP");
@@ -16,9 +17,22 @@ export default function OptiContainer(){
   const [selectedHUId, setSelectedHUId] = useState<string|null>(null);
   const [currentContainerIdx, setCurrentContainerIdx] = useState(0);
   const [repackVersion, setRepackVersion] = useState(0);
+  const { containers, setContainers } = useContainers();
 
   const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType, repackVersion]);
   const plan = plans[currentContainerIdx] || plans[0];
+
+  useEffect(() => {
+    const managed = plans.map((p, idx) => ({
+      id: `C-${idx + 1}`,
+      type: p.type,
+      properties: p.dims,
+      huIds: p.placements.map((pl) => pl.huId),
+    }));
+    setContainers(managed);
+  }, [plans, setContainers]);
+
+  const currentContainer = containers[currentContainerIdx];
 
   const containerVolume = volCm3(dims.L, dims.W, dims.H);
   const utilization = plan ? Math.min(100, (plan.usedVolumeCm3 / containerVolume) * 100) : 0;
@@ -73,6 +87,23 @@ export default function OptiContainer(){
             </div>
           </div>
           <Viewer3D dims={dims} placements={plan?.placements || []} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} />
+
+          <div className="card">
+            <div className="card-title">Container properties</div>
+            <ul>
+              <li><strong>Type:</strong> {currentContainer?.type}</li>
+              <li><strong>L×W×H (cm):</strong> {currentContainer?.properties.L}×{currentContainer?.properties.W}×{currentContainer?.properties.H}</li>
+              <li><strong>Max payload (kg):</strong> {currentContainer?.properties.maxPayloadKg}</li>
+              <li><strong>Allocated HUs:</strong> {currentContainer?.huIds.length || 0}</li>
+            </ul>
+            {currentContainer?.huIds.length ? (
+              <ul>
+                {currentContainer.huIds.map((id) => (
+                  <li key={id} className="mono">{id}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
 
           <div className="card">
             <div className="card-title">Placements in current container</div>

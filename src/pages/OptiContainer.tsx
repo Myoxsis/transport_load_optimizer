@@ -9,6 +9,7 @@ import { StatsBar } from "../components/StatsBar";
 import { HUEditModal } from "../components/HUEditModal";
 import { useHUs } from "../HUsContext";
 import { useContainers } from "../ContainersContext";
+import { useAutoAllocateRules } from "../AutoAllocateRulesContext";
 
 export default function OptiContainer(){
   const [containerType, setContainerType] = useState<ContainerTypeKey>("20GP");
@@ -17,6 +18,7 @@ export default function OptiContainer(){
   const [selectedHUId, setSelectedHUId] = useState<string|null>(null);
   const [currentContainerIdx, setCurrentContainerIdx] = useState<number>(-1);
   const [placementsMap, setPlacementsMap] = useState<Record<number, Placement[]>>({});
+  const { rules } = useAutoAllocateRules();
 
   const currentContainer = containers[currentContainerIdx];
   const placements = placementsMap[currentContainerIdx] || [];
@@ -66,7 +68,7 @@ export default function OptiContainer(){
   };
 
   const autoAllocate = () => {
-    const plans = packHUsIntoContainers(hus, containerType);
+    const plans = packHUsIntoContainers(hus, containerType, rules);
     const managed: ManagedContainer[] = plans.map((p,i)=>({ id:`C-${i+1}`, type:p.type, properties:p.dims, huIds:p.placements.map(pl=>pl.huId) }));
     const map: Record<number, Placement[]> = {};
     plans.forEach((p,i)=>{ map[i]=p.placements; });

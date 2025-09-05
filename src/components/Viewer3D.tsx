@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Html, Edges, DragControls, GizmoHelper, GizmoViewcube } from "@react-three/drei";
+import { OrbitControls, Grid, Html, Edges, DragControls, GizmoHelper, GizmoViewcube, TransformControls } from "@react-three/drei";
 import { ContainerDims, Placement } from "../types";
 import { cmToM, mToCm } from "../packing";
 import * as THREE from "three";
@@ -32,23 +32,37 @@ function ContainerWire({ dims }:{ dims: ContainerDims }){
 
 function DraggableHU({ placement, color, selected, onSelect, onUpdate }:{ placement: Placement; color: string; selected: boolean; onSelect:()=>void; onUpdate:(pl:Placement)=>void }){
   const group = useRef<THREE.Group>(null);
+  const gizmo = useRef<any>(null);
   const center:[number,number,number]=[cmToM(placement.x + placement.l/2), cmToM(placement.z + placement.h/2), cmToM(placement.y + placement.w/2)];
   const dragProps:any = { position: center, rotation:[0, placement.rotatedLW ? Math.PI/2 : 0, 0], matrixAutoUpdate: true };
+
+  useEffect(()=>{
+    if (selected) gizmo.current?.attach(group.current);
+    else gizmo.current?.detach();
+  }, [selected]);
+
+  const updateFromGroup = () => {
+    const g = group.current!;
+    g.updateMatrixWorld();
+    const pos = g.position; const rotY = g.rotation.y;
+    const rotated = Math.round(rotY / (Math.PI/2)) % 2 === 1;
+    const l = rotated ? placement.w : placement.l;
+    const w = rotated ? placement.l : placement.w;
+    const x = mToCm(pos.x) - l/2;
+    const y = mToCm(pos.z) - w/2;
+    const z = mToCm(pos.y) - placement.h/2;
+    onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated });
+  };
+
   return (
-    <DragControls ref={group} {...dragProps} onDragEnd={()=>{
-      const g = group.current!;
-      g.updateMatrixWorld();
-      const pos = g.position; const rotY = g.rotation.y;
-      const rotated = Math.round(rotY / (Math.PI/2)) % 2 === 1;
-      const l = rotated ? placement.w : placement.l;
-      const w = rotated ? placement.l : placement.w;
-      const x = mToCm(pos.x) - l/2;
-      const y = mToCm(pos.z) - w/2;
-      const z = mToCm(pos.y) - placement.h/2;
-      onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated });
-    }}>
-      <HUBox placement={placement} color={color} selected={selected} onClick={onSelect} onDoubleClick={(e)=>{ e.stopPropagation(); const g=group.current!; g.rotation.y += Math.PI/2; g.updateMatrixWorld(); const rotated=!placement.rotatedLW; const l=rotated?placement.w:placement.l; const w=rotated?placement.l:placement.w; const pos=g.position; const x=mToCm(pos.x)-l/2; const y=mToCm(pos.z)-w/2; const z=mToCm(pos.y)-placement.h/2; onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated }); }} />
-    </DragControls>
+    <>
+      <DragControls ref={group} {...dragProps} onDragEnd={updateFromGroup}>
+        <HUBox placement={placement} color={color} selected={selected} onClick={onSelect} onDoubleClick={(e)=>{ e.stopPropagation(); const g=group.current!; g.rotation.y += Math.PI/2; g.updateMatrixWorld(); const rotated=!placement.rotatedLW; const l=rotated?placement.w:placement.l; const w=rotated?placement.l:placement.w; const pos=g.position; const x=mToCm(pos.x)-l/2; const y=mToCm(pos.z)-w/2; const z=mToCm(pos.y)-placement.h/2; onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated }); }} />
+      </DragControls>
+      {selected && (
+        <TransformControls ref={gizmo} mode="translate" onMouseUp={updateFromGroup} />
+      )}
+    </>
   );
 }
 

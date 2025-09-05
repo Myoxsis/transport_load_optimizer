@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { HU, ContainerPlan, ContainerTypeKey } from "../types";
+import { HU, ContainerPlan, ContainerTypeKey, Placement } from "../types";
 import { CONTAINERS, packHUsIntoContainers, volCm3 } from "../packing";
 import { HUForm } from "../components/HUForm";
 import { HUList } from "../components/HUList";
@@ -21,6 +21,9 @@ export default function OptiContainer(){
 
   const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType, repackVersion]);
   const plan = plans[currentContainerIdx] || plans[0];
+  const [placements, setPlacements] = useState<Placement[]>(plan?.placements || []);
+
+  useEffect(()=>{ setPlacements(plan?.placements || []); }, [plan]);
 
   useEffect(() => {
     const managed = plans.map((p, idx) => ({
@@ -36,7 +39,7 @@ export default function OptiContainer(){
 
   const containerVolume = volCm3(dims.L, dims.W, dims.H);
   const utilization = plan ? Math.min(100, (plan.usedVolumeCm3 / containerVolume) * 100) : 0;
-  const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of plan?.placements || []) s.add(p.stopKey); return Array.from(s); }, [plan]);
+  const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of placements) s.add(p.stopKey); return Array.from(s); }, [placements]);
 
   const removeHU = (id: string) => { setHUs((prev)=>prev.filter((x)=>x.id!==id)); if (selectedHUId===id) setSelectedHUId(null); };
   const [editingHU, setEditingHU] = useState<HU|null>(null);
@@ -86,7 +89,7 @@ export default function OptiContainer(){
               <button className="btn" disabled={currentContainerIdx>=plans.length-1} onClick={()=>setCurrentContainerIdx((i)=>Math.min(plans.length-1, i+1))}>Next ▶</button>
             </div>
           </div>
-          <Viewer3D dims={dims} placements={plan?.placements || []} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} />
+          <Viewer3D dims={dims} placements={placements} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} onUpdatePlacement={(id,pl)=>setPlacements((prev)=>prev.map(p=>p.huId===id?pl:p))} />
 
           <div className="card">
             <div className="card-title">Container properties</div>
@@ -113,7 +116,7 @@ export default function OptiContainer(){
                   <tr><th>Handling Unit</th><th>Stop</th><th>L×W×H (cm)</th><th>Pos (x,y,z cm)</th><th>Rot</th></tr>
                 </thead>
                 <tbody>
-                  {plan?.placements.map((p,i)=> (
+                  {placements.map((p,i)=> (
                     <tr key={i} className={selectedHUId===p.huId?"active":""}>
                       <td className="mono">{p.huId}</td>
                       <td>{p.stopKey}</td>

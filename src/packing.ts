@@ -7,6 +7,7 @@ export const CONTAINERS: Record<ContainerTypeKey, ContainerDims> = {
 
 export const volCm3 = (l: number, w: number, h: number) => l * w * h;
 export const cmToM = (v: number) => v / 100.0;
+export const mToCm = (v: number) => v * 100.0;
 export const stopKey = (date: string, place: string) => `${date} | ${place.trim()}`;
 
 type Row = { yStart: number; depth: number; xCursor: number; };

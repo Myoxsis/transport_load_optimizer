@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { HU } from "../types";
 import { useHUs } from "../HUsContext";
+import { useAutoAllocateRules } from "../AutoAllocateRulesContext";
 
 export default function Settings() {
   const { hus, setHUs } = useHUs();
+  const { rules, setRules } = useAutoAllocateRules();
   const [error, setError] = useState<string | null>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,11 +57,11 @@ export default function Settings() {
       </div>
 
       <div className="card">
-        <div className="card-title">Loaded Handling Units</div>
-        <div className="list">
-          {hus.map((h) => (
-            <div key={h.id} className="list-item">
-              <div>
+      <div className="card-title">Loaded Handling Units</div>
+      <div className="list">
+        {hus.map((h) => (
+          <div key={h.id} className="list-item">
+            <div>
                 <div className="list-title">{h.id}</div>
                 <div className="muted">{h.length_cm}×{h.width_cm}×{h.height_cm} cm · {h.weight_kg} kg · {h.stackable ? "Stackable" : "No stack"}</div>
                 <div className="muted">{h.deliveryDate} — {h.place}</div>
@@ -68,9 +70,31 @@ export default function Settings() {
                 <button className="btn danger" onClick={() => removeHU(h.id)}>Remove</button>
               </div>
             </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
+
+    <div className="card">
+      <div className="card-title">Auto allocation rules</div>
+      <div className="list">
+        <label className="row gap">
+          <input
+            type="checkbox"
+            checked={rules.lifoByDelivery}
+            onChange={(e) => setRules(r => ({ ...r, lifoByDelivery: e.target.checked }))}
+          />
+          <span>LIFO by delivery (latest stop at far end)</span>
+        </label>
+        <label className="row gap">
+          <input
+            type="checkbox"
+            checked={rules.respectStackable}
+            onChange={(e) => setRules(r => ({ ...r, respectStackable: e.target.checked }))}
+          />
+          <span>Prevent stacking above non-stackable HUs</span>
+        </label>
+      </div>
+    </div>
+  </div>
   );
 }

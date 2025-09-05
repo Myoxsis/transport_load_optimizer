@@ -1,4 +1,5 @@
 import { HU, ContainerTypeKey, ContainerDims, ContainerPlan, Placement } from "./types";
+import { AutoAllocateRules } from "./AutoAllocateRulesContext";
 
 export const CONTAINERS: Record<ContainerTypeKey, ContainerDims> = {
   "20GP": { name: "20' Standard (20GP)", L: 589, W: 235, H: 239, maxPayloadKg: 28200 },
@@ -29,8 +30,9 @@ function tryPlaceInRow(hu: HU, level: Level, row: Row, dims: ContainerDims, grou
   return null;
 }
 
-export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTypeKey): ContainerPlan[] {
+export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTypeKey, rules: AutoAllocateRules = { lifoByDelivery: true, respectStackable: true }): ContainerPlan[] {
   const dims = CONTAINERS[containerType];
+  const { lifoByDelivery, respectStackable } = rules;
   const groupsMap = new Map<string, HU[]>();
   for (const hu of inputHUs) { const key = stopKey(hu.deliveryDate, hu.place); if (!groupsMap.has(key)) groupsMap.set(key, []); groupsMap.get(key)!.push(hu); }
   const groups = Array.from(groupsMap.entries()).map(([key, items]) => ({ key, date: new Date(items[0].deliveryDate), items }))
@@ -39,7 +41,7 @@ export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTy
 
   const containers: WorkingContainer[] = [newWorkingContainer(dims)];
   let current = containers[0];
-  const stopsInPlacementOrder = [...groups].reverse();
+  const stopsInPlacementOrder = lifoByDelivery ? [...groups].reverse() : groups;
 
   for (const g of stopsInPlacementOrder) {
     for (const hu of g.items) {
@@ -65,7 +67,7 @@ export function packHUsIntoContainers(inputHUs: HU[], containerType: ContainerTy
           }
         }
         if (!placed) {
-          const cannotStack = current.hasNonStackable; const nextZ = level.zStart + (level.height || 0); const h = hu.height_cm;
+          const cannotStack = respectStackable && current.hasNonStackable; const nextZ = level.zStart + (level.height || 0); const h = hu.height_cm;
           if (!cannotStack && nextZ + h <= dims.H) {
             const newLevel: Level = { zStart: nextZ, height: 0, rows: [] }; current.levels.push(newLevel); level = newLevel;
               const options: [number, number, boolean][] = [[hu.width_cm, hu.length_cm, false],[hu.length_cm, hu.width_cm, true]];

@@ -5,13 +5,16 @@ import App from "./App";
 import "./styles.css";
 import { HUsProvider } from "./HUsContext";
 import { ContainersProvider } from "./ContainersContext";
+import { AutoAllocateRulesProvider } from "./AutoAllocateRulesContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ContainersProvider>
         <HUsProvider>
-          <App />
+          <AutoAllocateRulesProvider>
+            <App />
+          </AutoAllocateRulesProvider>
         </HUsProvider>
       </ContainersProvider>
     </BrowserRouter>

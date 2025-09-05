@@ -6,6 +6,7 @@ import { HUList } from "../components/HUList";
 import { Legend } from "../components/Legend";
 import { Viewer3D } from "../components/Viewer3D";
 import { StatsBar } from "../components/StatsBar";
+import { HUEditModal } from "../components/HUEditModal";
 import { useHUs } from "../HUsContext";
 
 export default function OptiContainer(){
@@ -24,44 +25,18 @@ export default function OptiContainer(){
   const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of plan?.placements || []) s.add(p.stopKey); return Array.from(s); }, [plan]);
 
   const removeHU = (id: string) => { setHUs((prev)=>prev.filter((x)=>x.id!==id)); if (selectedHUId===id) setSelectedHUId(null); };
-
-  const editHU = (hu: HU) => {
-    const parse = (s: string | null, fallback: number) => {
-      if (s === null) return fallback;
-      const n = Number(s);
-      return isNaN(n) ? fallback : n;
-    };
-    const lengthStr = prompt("Length (cm)", String(hu.length_cm));
-    if (lengthStr === null) return;
-    const widthStr = prompt("Width (cm)", String(hu.width_cm));
-    if (widthStr === null) return;
-    const heightStr = prompt("Height (cm)", String(hu.height_cm));
-    if (heightStr === null) return;
-    const weightStr = prompt("Weight (kg)", String(hu.weight_kg));
-    if (weightStr === null) return;
-    const stackableStr = prompt("Stackable? (yes/no)", hu.stackable ? "yes" : "no");
-    if (stackableStr === null) return;
-    const deliveryDateStr = prompt("Delivery date (YYYY-MM-DD)", hu.deliveryDate);
-    if (deliveryDateStr === null) return;
-    const placeStr = prompt("Place of delivery", hu.place);
-    if (placeStr === null) return;
-    const updated: HU = {
-      ...hu,
-      length_cm: parse(lengthStr, hu.length_cm),
-      width_cm: parse(widthStr, hu.width_cm),
-      height_cm: parse(heightStr, hu.height_cm),
-      weight_kg: parse(weightStr, hu.weight_kg),
-      stackable: stackableStr.trim().toLowerCase().startsWith("y"),
-      deliveryDate: deliveryDateStr,
-      place: placeStr,
-    };
-    setHUs((prev) => prev.map((x) => (x.id === hu.id ? updated : x)));
+  const [editingHU, setEditingHU] = useState<HU|null>(null);
+  const editHU = (hu: HU) => { setEditingHU(hu); };
+  const handleSaveHU = (hu: HU) => {
+    setHUs((prev) => prev.map((x) => (x.id === hu.id ? hu : x)));
     setCurrentContainerIdx(0);
+    setEditingHU(null);
   };
 
   return (
-    <div className="layout">
-      <header className="header">
+    <>
+      <div className="layout">
+        <header className="header">
         <h1>Container Optimizer — MVP</h1>
         <div className="segmented">
           <button className={`seg ${containerType==="20GP"?"active":""}`} onClick={()=>{ setContainerType("20GP"); setCurrentContainerIdx(0); }}>20′ Standard</button>
@@ -126,5 +101,7 @@ export default function OptiContainer(){
 
       <footer className="footer">MVP heuristic — add door aperture checks, center-of-gravity and stackability rules before production.</footer>
     </div>
+      {editingHU && <HUEditModal hu={editingHU} onSave={handleSaveHU} onCancel={()=>setEditingHU(null)} />}
+    </>
   );
 }

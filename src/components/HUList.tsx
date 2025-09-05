@@ -1,6 +1,6 @@
 import React from "react";
 import { HU } from "../types";
-export function HUList({ items, onRemove, onFocus, onEdit, selectedId }: { items: HU[]; onRemove: (id: string)=>void; onFocus: (id: string)=>void; onEdit: (hu: HU)=>void; selectedId: string|null }) {
+export function HUList({ items, onRemove, onFocus, onEdit, onAssign, selectedId }: { items: HU[]; onRemove: (id: string)=>void; onFocus: (id: string)=>void; onEdit: (hu: HU)=>void; onAssign?: (id: string)=>void; selectedId: string|null }) {
   return (
     <div className="card">
       <div className="card-title">Handling Units</div>
@@ -13,6 +13,7 @@ export function HUList({ items, onRemove, onFocus, onEdit, selectedId }: { items
               <div className="muted">{h.deliveryDate} — {h.place}</div>
             </div>
             <div className="row gap">
+              {onAssign && <button className="btn" onClick={()=>onAssign(h.id)}>Assign</button>}
               <button className="btn" onClick={()=>onFocus(h.id)}>Focus</button>
               <button className="btn" onClick={()=>onEdit(h)}>Edit</button>
               <button className="btn danger" onClick={()=>onRemove(h.id)}>Remove</button>

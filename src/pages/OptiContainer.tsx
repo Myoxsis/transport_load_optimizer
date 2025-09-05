@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { HU, ContainerPlan, ContainerTypeKey, Placement } from "../types";
-import { CONTAINERS, packHUsIntoContainers, volCm3 } from "../packing";
+import { CONTAINERS, packHUsIntoContainers, volCm3, stopKey } from "../packing";
 import { HUForm } from "../components/HUForm";
 import { HUList } from "../components/HUList";
 import { Legend } from "../components/Legend";
@@ -21,9 +21,19 @@ export default function OptiContainer(){
 
   const plans: ContainerPlan[] = useMemo(()=>packHUsIntoContainers(hus, containerType), [hus, containerType, repackVersion]);
   const plan = plans[currentContainerIdx] || plans[0];
-  const [placements, setPlacements] = useState<Placement[]>(plan?.placements || []);
+  const [placementsMap, setPlacementsMap] = useState<Record<number, Placement[]>>(() => {
+    const init: Record<number, Placement[]> = {};
+    plans.forEach((p, idx) => { init[idx] = p.placements; });
+    return init;
+  });
 
-  useEffect(()=>{ setPlacements(plan?.placements || []); }, [plan]);
+  useEffect(() => {
+    const init: Record<number, Placement[]> = {};
+    plans.forEach((p, idx) => { init[idx] = p.placements; });
+    setPlacementsMap(init);
+  }, [plans]);
+
+  const placements = placementsMap[currentContainerIdx] || [];
 
   useEffect(() => {
     const managed = plans.map((p, idx) => ({
@@ -42,6 +52,27 @@ export default function OptiContainer(){
   const stops = useMemo(()=>{ const s = new Set<string>(); for (const p of placements) s.add(p.stopKey); return Array.from(s); }, [placements]);
 
   const removeHU = (id: string) => { setHUs((prev)=>prev.filter((x)=>x.id!==id)); if (selectedHUId===id) setSelectedHUId(null); };
+  const assignToCurrent = (id: string) => {
+    const hu = hus.find(h => h.id === id);
+    if (!hu) return;
+    if (currentContainer?.huIds.includes(id)) return;
+    const newPlacement: Placement = {
+      huId: id,
+      l: hu.length_cm,
+      w: hu.width_cm,
+      h: hu.height_cm,
+      x: 0,
+      y: 0,
+      z: 0,
+      rotatedLW: false,
+      stopKey: stopKey(hu.deliveryDate, hu.place),
+    };
+    setPlacementsMap(prev => ({
+      ...prev,
+      [currentContainerIdx]: [...(prev[currentContainerIdx] || []), newPlacement],
+    }));
+    setContainers(prev => prev.map((c,i) => i===currentContainerIdx ? { ...c, huIds: [...c.huIds, id] } : c));
+  };
   const [editingHU, setEditingHU] = useState<HU|null>(null);
   const editHU = (hu: HU) => { setEditingHU(hu); };
   const handleSaveHU = (hu: HU) => {
@@ -76,7 +107,7 @@ export default function OptiContainer(){
       <div className="content">
         <div className="left">
           <HUForm onAdd={(hu)=>{ setHUs((p)=>[...p, hu]); setCurrentContainerIdx(0); }} />
-          <HUList items={hus} onRemove={removeHU} onFocus={setSelectedHUId} onEdit={editHU} selectedId={selectedHUId} />
+          <HUList items={hus} onRemove={removeHU} onFocus={setSelectedHUId} onEdit={editHU} onAssign={assignToCurrent} selectedId={selectedHUId} />
           <Legend stops={stops} />
         </div>
 
@@ -89,7 +120,7 @@ export default function OptiContainer(){
               <button className="btn" disabled={currentContainerIdx>=plans.length-1} onClick={()=>setCurrentContainerIdx((i)=>Math.min(plans.length-1, i+1))}>Next ▶</button>
             </div>
           </div>
-          <Viewer3D dims={dims} placements={placements} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} onUpdatePlacement={(id,pl)=>setPlacements((prev)=>prev.map(p=>p.huId===id?pl:p))} />
+          <Viewer3D dims={dims} placements={placements} stops={stops} selectedHUId={selectedHUId} onSelect={setSelectedHUId} onUpdatePlacement={(id,pl)=>setPlacementsMap(prev=>({ ...prev, [currentContainerIdx]: (prev[currentContainerIdx]||[]).map(p=>p.huId===id?pl:p) }))} />
 
           <div className="card">
             <div className="card-title">Container properties</div>

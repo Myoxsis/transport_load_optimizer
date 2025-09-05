@@ -6,16 +6,12 @@ import { HUList } from "../components/HUList";
 import { Legend } from "../components/Legend";
 import { Viewer3D } from "../components/Viewer3D";
 import { StatsBar } from "../components/StatsBar";
+import { useHUs } from "../HUsContext";
 
 export default function OptiContainer(){
   const [containerType, setContainerType] = useState<ContainerTypeKey>("20GP");
   const dims = CONTAINERS[containerType];
-  const [hus, setHUs] = useState<HU[]>([
-    { id: "HU-001", length_cm: 240, width_cm: 100, height_cm: 110, weight_kg: 480, stackable: false, deliveryDate: "2025-09-20", place: "Lyon" },
-    { id: "HU-002", length_cm: 120, width_cm: 80, height_cm: 75, weight_kg: 220, stackable: true, deliveryDate: "2025-09-18", place: "Lyon" },
-    { id: "HU-003", length_cm: 310, width_cm: 90, height_cm: 100, weight_kg: 600, stackable: true, deliveryDate: "2025-09-25", place: "Bordeaux" },
-    { id: "HU-004", length_cm: 200, width_cm: 120, height_cm: 150, weight_kg: 350, stackable: true, deliveryDate: "2025-09-18", place: "Lyon" },
-  ]);
+  const { hus, setHUs } = useHUs();
   const [selectedHUId, setSelectedHUId] = useState<string|null>(null);
   const [currentContainerIdx, setCurrentContainerIdx] = useState(0);
   const [repackVersion, setRepackVersion] = useState(0);

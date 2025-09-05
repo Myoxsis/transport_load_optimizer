@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Html, Edges, DragControls } from "@react-three/drei";
+import { OrbitControls, Grid, Html, Edges, DragControls, GizmoHelper, GizmoViewcube } from "@react-three/drei";
 import { ContainerDims, Placement } from "../types";
 import { cmToM, mToCm } from "../packing";
 import * as THREE from "three";
@@ -80,6 +80,9 @@ export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect, onUp
           );
         })}
         <OrbitControls makeDefault target={[cmToM(dims.L/2), cmToM(dims.H/2), cmToM(dims.W/2)] as any} />
+        <GizmoHelper alignment="top-right" margin={[80,80]}>
+          <GizmoViewcube faces={["RIGHT", "LEFT", "TOP", "BOTTOM", "FRONT", "BACK"]} />
+        </GizmoHelper>
         <Html position={[0, cmToM(5), cmToM(dims.W)/2]}>
           <div className="door-label">Door side (x=0)</div>
         </Html>

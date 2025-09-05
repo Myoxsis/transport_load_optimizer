@@ -1,23 +1,23 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Html, Edges } from "@react-three/drei";
+import { OrbitControls, Grid, Html, Edges, DragControls } from "@react-three/drei";
 import { ContainerDims, Placement } from "../types";
-import { cmToM } from "../packing";
+import { cmToM, mToCm } from "../packing";
+import * as THREE from "three";
 
-function HUBox({ placement, color, selected, onClick }:{ placement: Placement; color: string; selected: boolean; onClick:()=>void }){
-  const { l,w,h,x,y,z } = placement;
+const HUBox = React.forwardRef<THREE.Mesh, { placement: Placement; color: string; selected: boolean; onClick:()=>void; onDoubleClick: (e: any)=>void }>(({ placement, color, selected, onClick, onDoubleClick }, ref) => {
+  const { l,w,h } = placement;
   const [hovered, setHovered] = useState(false);
-  const pos:[number,number,number]=[cmToM(x + l/2), cmToM(z + h/2), cmToM(y + w/2)];
   const size:[number,number,number]=[cmToM(l), cmToM(h), cmToM(w)];
   const opacity = selected ? 0.95 : hovered ? 0.85 : 0.75;
   return (
-    <mesh position={pos} onClick={onClick} onPointerOver={()=>setHovered(true)} onPointerOut={()=>setHovered(false)}>
+    <mesh ref={ref} onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={()=>setHovered(true)} onPointerOut={()=>setHovered(false)}>
       <boxGeometry args={size} />
       <meshStandardMaterial transparent opacity={opacity} color={color} />
       <Edges threshold={15} />
     </mesh>
   );
-}
+});
 
 function ContainerWire({ dims }:{ dims: ContainerDims }){
   const size:[number,number,number]=[cmToM(dims.L), cmToM(dims.H), cmToM(dims.W)];
@@ -30,7 +30,29 @@ function ContainerWire({ dims }:{ dims: ContainerDims }){
   );
 }
 
-export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect }:{ dims: ContainerDims; placements: Placement[]; stops: string[]; selectedHUId: string|null; onSelect: (id:string)=>void }){
+function DraggableHU({ placement, color, selected, onSelect, onUpdate }:{ placement: Placement; color: string; selected: boolean; onSelect:()=>void; onUpdate:(pl:Placement)=>void }){
+  const group = useRef<THREE.Group>(null);
+  const center:[number,number,number]=[cmToM(placement.x + placement.l/2), cmToM(placement.z + placement.h/2), cmToM(placement.y + placement.w/2)];
+  const dragProps:any = { position: center, rotation:[0, placement.rotatedLW ? Math.PI/2 : 0, 0], axisLock: "y", matrixAutoUpdate: true };
+  return (
+    <DragControls ref={group} {...dragProps} onDragEnd={()=>{
+      const g = group.current!;
+      g.updateMatrixWorld();
+      const pos = g.position; const rotY = g.rotation.y;
+      const rotated = Math.round(rotY / (Math.PI/2)) % 2 === 1;
+      const l = rotated ? placement.w : placement.l;
+      const w = rotated ? placement.l : placement.w;
+      const x = mToCm(pos.x) - l/2;
+      const y = mToCm(pos.z) - w/2;
+      const z = mToCm(pos.y) - placement.h/2;
+      onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated });
+    }}>
+      <HUBox placement={placement} color={color} selected={selected} onClick={onSelect} onDoubleClick={(e)=>{ e.stopPropagation(); const g=group.current!; g.rotation.y += Math.PI/2; g.updateMatrixWorld(); const rotated=!placement.rotatedLW; const l=rotated?placement.w:placement.l; const w=rotated?placement.l:placement.w; const pos=g.position; const x=mToCm(pos.x)-l/2; const y=mToCm(pos.z)-w/2; const z=mToCm(pos.y)-placement.h/2; onUpdate({ ...placement, l, w, x, y, z, rotatedLW: rotated }); }} />
+    </DragControls>
+  );
+}
+
+export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect, onUpdatePlacement }:{ dims: ContainerDims; placements: Placement[]; stops: string[]; selectedHUId: string|null; onSelect: (id:string)=>void; onUpdatePlacement:(id:string, placement:Placement)=>void }){
   const cameraPos = useMemo(()=>[cmToM(dims.L*0.8), cmToM(dims.H*1.2), cmToM(dims.W*1.6)], [dims]);
   return (
     <div className="viewer">
@@ -41,7 +63,7 @@ export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect }:{ d
         <Grid position={[cmToM(dims.L/2), 0.001, cmToM(dims.W/2)]} args={[cmToM(dims.L), cmToM(dims.W)]} cellSize={0.25} sectionThickness={1} infiniteGrid={false} />
         {placements.map((p, idx)=>{
           const color = getColor(stops.indexOf(p.stopKey));
-          return <HUBox key={`${p.huId}-${idx}`} placement={p} color={color} selected={selectedHUId===p.huId} onClick={()=>onSelect(p.huId)} />;
+          return <DraggableHU key={`${p.huId}-${idx}`} placement={p} color={color} selected={selectedHUId===p.huId} onSelect={()=>onSelect(p.huId)} onUpdate={(pl)=>onUpdatePlacement(p.huId, pl)} />;
         })}
         <OrbitControls makeDefault target={[cmToM(dims.L/2), cmToM(dims.H/2), cmToM(dims.W/2)] as any} />
         <Html position={[0, cmToM(5), cmToM(dims.W)/2]}>

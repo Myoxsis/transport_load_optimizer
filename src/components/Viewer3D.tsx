@@ -33,7 +33,7 @@ function ContainerWire({ dims }:{ dims: ContainerDims }){
 function DraggableHU({ placement, color, selected, onSelect, onUpdate }:{ placement: Placement; color: string; selected: boolean; onSelect:()=>void; onUpdate:(pl:Placement)=>void }){
   const group = useRef<THREE.Group>(null);
   const center:[number,number,number]=[cmToM(placement.x + placement.l/2), cmToM(placement.z + placement.h/2), cmToM(placement.y + placement.w/2)];
-  const dragProps:any = { position: center, rotation:[0, placement.rotatedLW ? Math.PI/2 : 0, 0], axisLock: "y", matrixAutoUpdate: true };
+  const dragProps:any = { position: center, rotation:[0, placement.rotatedLW ? Math.PI/2 : 0, 0], matrixAutoUpdate: true };
   return (
     <DragControls ref={group} {...dragProps} onDragEnd={()=>{
       const g = group.current!;
@@ -54,6 +54,10 @@ function DraggableHU({ placement, color, selected, onSelect, onUpdate }:{ placem
 
 export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect, onUpdatePlacement }:{ dims: ContainerDims; placements: Placement[]; stops: string[]; selectedHUId: string|null; onSelect: (id:string)=>void; onUpdatePlacement:(id:string, placement:Placement)=>void }){
   const cameraPos = useMemo(()=>[cmToM(dims.L*0.8), cmToM(dims.H*1.2), cmToM(dims.W*1.6)], [dims]);
+  const isInside = (p: Placement) =>
+    p.x >= 0 && p.y >= 0 && p.z >= 0 &&
+    p.x + p.l <= dims.L && p.y + p.w <= dims.W && p.z + p.h <= dims.H;
+  const invalidIds = placements.filter(p => !isInside(p)).map(p => p.huId);
   return (
     <div className="viewer">
       <Canvas camera={{ position: cameraPos as any, fov: 50 }}>
@@ -62,14 +66,25 @@ export function Viewer3D({ dims, placements, stops, selectedHUId, onSelect, onUp
         <ContainerWire dims={dims} />
         <Grid position={[cmToM(dims.L/2), 0.001, cmToM(dims.W/2)]} args={[cmToM(dims.L), cmToM(dims.W)]} cellSize={0.25} sectionThickness={1} infiniteGrid={false} />
         {placements.map((p, idx)=>{
-          const color = getColor(stops.indexOf(p.stopKey));
-          return <DraggableHU key={`${p.huId}-${idx}`} placement={p} color={color} selected={selectedHUId===p.huId} onSelect={()=>onSelect(p.huId)} onUpdate={(pl)=>onUpdatePlacement(p.huId, pl)} />;
+          const invalid = invalidIds.includes(p.huId);
+          const color = invalid ? "#ff0000" : getColor(stops.indexOf(p.stopKey));
+          return (
+            <DraggableHU
+              key={`${p.huId}-${idx}`}
+              placement={p}
+              color={color}
+              selected={selectedHUId===p.huId}
+              onSelect={()=>onSelect(p.huId)}
+              onUpdate={(pl)=>onUpdatePlacement(p.huId, pl)}
+            />
+          );
         })}
         <OrbitControls makeDefault target={[cmToM(dims.L/2), cmToM(dims.H/2), cmToM(dims.W/2)] as any} />
         <Html position={[0, cmToM(5), cmToM(dims.W)/2]}>
           <div className="door-label">Door side (x=0)</div>
         </Html>
       </Canvas>
+      {invalidIds.length>0 && <div className="viewer-error error">HU outside container bounds</div>}
     </div>
   );
 }
